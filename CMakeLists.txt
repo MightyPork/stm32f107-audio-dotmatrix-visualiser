@@ -1,7 +1,7 @@
 project(f107-fft C ASM)
 cmake_minimum_required(VERSION 3.5.0)
 
-file(GLOB_RECURSE USER_SOURCES "Src/*.c")
+file(GLOB_RECURSE USER_SOURCES "Src/*.c" "Max2719/*.c")
 file(GLOB_RECURSE HAL_SOURCES "Drivers/STM32F1xx_HAL_Driver/Src/*.c")
 
 add_library(HAL ${HAL_SOURCES})
@@ -13,12 +13,16 @@ include_directories(Inc)
 include_directories(Drivers/STM32F1xx_HAL_Driver/Inc)
 include_directories(Drivers/CMSIS/Include)
 include_directories(Drivers/CMSIS/Device/ST/STM32F1xx/Include)
+include_directories(Max2719)
+include_directories(/usr/arm-none-eabi/include)
+include_directories(/usr/lib/gcc/arm-none-eabi/6.1.1/include/)
+
 
 add_definitions(-DSTM32F107xC)
 add_definitions(-DUSE_FULL_ASSERT)
 add_executable(${PROJECT_NAME}.elf ${USER_SOURCES} ${LINKER_SCRIPT})
 
-target_link_libraries(${PROJECT_NAME}.elf HAL CMSIS)
+target_link_libraries(${PROJECT_NAME}.elf HAL CMSIS )
 
 set(HEX_FILE ${PROJECT_SOURCE_DIR}/build/${PROJECT_NAME}.hex)
 set(BIN_FILE ${PROJECT_SOURCE_DIR}/build/${PROJECT_NAME}.bin)
