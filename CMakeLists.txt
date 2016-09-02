@@ -15,6 +15,7 @@ include_directories(Drivers/CMSIS/Include)
 include_directories(Drivers/CMSIS/Device/ST/STM32F1xx/Include)
 
 add_definitions(-DSTM32F107xC)
+add_definitions(-DUSE_FULL_ASSERT)
 add_executable(${PROJECT_NAME}.elf ${USER_SOURCES} ${LINKER_SCRIPT})
 
 target_link_libraries(${PROJECT_NAME}.elf HAL CMSIS)

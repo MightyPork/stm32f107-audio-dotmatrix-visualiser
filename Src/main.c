@@ -31,7 +31,6 @@
   ******************************************************************************
   */
 /* Includes ------------------------------------------------------------------*/
-#include <inttypes.h>
 #include "stm32f1xx_hal.h"
 #include "adc.h"
 #include "dma.h"
@@ -41,8 +40,7 @@
 #include "gpio.h"
 
 /* USER CODE BEGIN Includes */
-#include "utils.h"
-
+#include "user_main.h"
 /* USER CODE END Includes */
 
 /* Private variables ---------------------------------------------------------*/
@@ -64,32 +62,12 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN 0 */
 
-static uint32_t audio_samples[256];
-
-void start_DMA() {
-	uart_print("- Starting ADC DMA\n");
-
-	HAL_ADC_Start_DMA(&hadc1, audio_samples, 256);
-	HAL_TIM_Base_Start(&htim3);
-}
-
-/** This callback is called by HAL after the transfer is complete */
-void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
-{
-	uart_print("- DMA complete.\n");
-
-	char x[100];
-	sprintf(x, "%"PRIu32"\n", audio_samples[0]);
-	uart_print(x);
-}
-
 /* USER CODE END 0 */
 
 int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-
   /* USER CODE END 1 */
 
   /* MCU Configuration----------------------------------------------------------*/
@@ -109,36 +87,14 @@ int main(void)
   MX_USART1_UART_Init();
 
   /* USER CODE BEGIN 2 */
-
-	// Leds OFF
-	HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, 1);
-	HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, 1);
-	HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, 1);
-	HAL_GPIO_WritePin(LED4_GPIO_Port, LED4_Pin, 1);
-
-	// Enable audio input
-	HAL_GPIO_WritePin(AUDIO_NSTBY_GPIO_Port, AUDIO_NSTBY_Pin, 1);
-
-
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wmissing-noreturn"
-	while (1) {
   /* USER CODE END WHILE */
 
   /* USER CODE BEGIN 3 */
-
-		// Blink
-		HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
-		HAL_Delay(500);
-
-		uart_print("Main loop\n");
-		start_DMA();
-	}
-#pragma clang diagnostic pop
+  user_main();
   /* USER CODE END 3 */
 
 }
@@ -207,9 +163,8 @@ void SystemClock_Config(void)
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler */
-	/* User can add his own implementation to report the HAL error return state */
-	while (1) {
-	}
+  /* User can add his own implementation to report the HAL error return state */
+  user_Error_Handler();
   /* USER CODE END Error_Handler */ 
 }
 
@@ -226,7 +181,10 @@ void assert_failed(uint8_t* file, uint32_t line)
 {
   /* USER CODE BEGIN 6 */
   /* User can add his own implementation to report the file name and line number,
-	ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
+    ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
+
+  user_assert_failed(file, line);
+
   /* USER CODE END 6 */
 
 }
