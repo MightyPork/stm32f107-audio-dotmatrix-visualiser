@@ -35,7 +35,7 @@ static DotMatrix_Cfg *disp;
 
 static volatile bool capture_pending = false;
 
-static float waveform_scale = 1;
+static float waveform_scale = 3;
 
 static void display_wave();
 static void display_fft();
@@ -234,8 +234,6 @@ void user_main()
 {
 	banner("== USER CODE STARTING ==");
 
-	info("Hello world");
-
 	user_init();
 
 	ms_time_t counter1 = 0;
@@ -254,8 +252,12 @@ void user_main()
 
 			if (down_pressed) {
 				if (waveform_scale > 0.1) {
-					waveform_scale -= 0.05;
+					waveform_scale -= 0.1;
 				}
+			}
+
+			if (up_pressed || down_pressed) {
+				dbg("scale = %.1f", waveform_scale);
 			}
 		}
 
