@@ -1,5 +1,6 @@
 #include "timebase.h"
 #include "malloc_safe.h"
+#include "debug.h"
 
 // Time base
 static volatile ms_time_t SystemTime_ms = 0;
@@ -87,8 +88,7 @@ static periodic_task_t* claim_periodic_task_slot(ms_time_t interval, bool enqueu
 		return task;
 	}
 
-	// TODO logging
-	//error("Periodic task table full.");
+	error("Periodic task table full.");
 
 	return NULL;
 }

@@ -1,6 +1,5 @@
 #include <string.h>
 #include <stdbool.h>
-#include <utils.h>
 #include "dotmatrix.h"
 #include "malloc_safe.h"
 

@@ -36,8 +36,7 @@
 #include "stm32f1xx_it.h"
 
 /* USER CODE BEGIN 0 */
-#include "utils.h"
-
+#include "debug.h"
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
@@ -94,6 +93,8 @@ prvGetRegistersFromStack(uint32_t *pulFaultStackAddress)
 	pc = pulFaultStackAddress[ 6 ];
 	psr = pulFaultStackAddress[ 7 ];
 
+	error("Hard fault.");
+
 	/* When the following line is hit, the variables contain the register values. */
 	for (;;);
 }
@@ -131,7 +132,7 @@ void HardFault_Handler(void)
 void MemManage_Handler(void)
 {
   /* USER CODE BEGIN MemoryManagement_IRQn 0 */
-  uart_print("MemManage fault.\n");
+  error("MemManage fault.\n");
 
   /* USER CODE END MemoryManagement_IRQn 0 */
   while (1)
@@ -148,7 +149,7 @@ void MemManage_Handler(void)
 void BusFault_Handler(void)
 {
   /* USER CODE BEGIN BusFault_IRQn 0 */
-  uart_print("Bus fault.\n");
+  error("Bus fault.\n");
 
   /* USER CODE END BusFault_IRQn 0 */
   while (1)
@@ -165,7 +166,7 @@ void BusFault_Handler(void)
 void UsageFault_Handler(void)
 {
   /* USER CODE BEGIN UsageFault_IRQn 0 */
-  uart_print("Usage fault.\n");
+  error("Usage fault.\n");
 
   /* USER CODE END UsageFault_IRQn 0 */
   while (1)

@@ -9,11 +9,11 @@
 #include "dotmatrix.h"
 #include "mxconstants.h"
 #include "stm32f1xx_hal.h"
-#include "utils.h"
 #include "adc.h"
 #include "tim.h"
 #include "user_main.h"
 #include "debounce.h"
+#include "debug.h"
 
 #define SAMPLE_COUNT 256
 #define BIN_COUNT (SAMPLE_COUNT/2)
@@ -160,12 +160,7 @@ void HAL_SYSTICK_Callback(void)
 
 static void gamepad_button_press(uint32_t btn)
 {
-	uart_print("Button press ");
-	char x[2];
-	x[0] = '0' + btn;
-	x[1] = 0;
-	uart_print(x);
-	uart_print("\n");
+	dbg("Button press %d", btn);
 }
 
 void user_init() {
@@ -225,7 +220,9 @@ void user_init() {
 
 void user_main()
 {
-	uart_print("== USER CODE STARTING ==\n");
+	banner("== USER CODE STARTING ==");
+
+	info("Hello world");
 
 	user_init();
 
@@ -247,7 +244,7 @@ void user_main()
 
 void user_Error_Handler()
 {
-	uart_print("HAL error occurred.\n");
+	error("HAL error occurred.\n");
 	while (1);
 }
 
@@ -265,16 +262,7 @@ void user_assert_failed(uint8_t *file, uint32_t line)
 
 void user_error_file_line(const char *message, const char *file, uint32_t line)
 {
-	uart_print(message);
-	uart_print(" in file ");
-	uart_print((char *) file);
-	uart_print(" on line ");
-
-	char x[10];
-	sprintf(x, "%"PRIu32, line);
-	uart_print(x);
-	uart_print("\n");
-
+	error("%s in file %s on line %d", message, file, line);
 	while (1);
 }
 
