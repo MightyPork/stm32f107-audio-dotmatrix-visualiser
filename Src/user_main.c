@@ -81,9 +81,28 @@ void spread_samples_for_fft()
 /** Display waveform preview */
 void display_wave()
 {
+	float wave_y_mult = 0.0078125f;
+	float relative = 3;
+
+	samples_to_float();
+
+	int x_offset = 0;
+
+	for (int i = 1; i < SAMPLE_COUNT; i++) {
+		if (audio_samples_f[i] > 0 && audio_samples_f[i-1] < 0) {
+			x_offset = i;
+			break;
+		}
+	}
+
+	// make sure we're not gonna run out of range
+	if (x_offset >= SAMPLE_COUNT - SCREEN_W) {
+		x_offset = 0;
+	}
+
 	dmtx_clear(disp);
-	for (int i = 0; i < 32; i++) {
-		dmtx_set(disp, i, ((audio_samples[i]) >> 6) - 24, 1);
+	for (int i = 0; i < SCREEN_W; i++) {
+		dmtx_set(disp, i, 7 + roundf(audio_samples_f[i + x_offset] * wave_y_mult * relative), 1);
 	}
 	dmtx_show(disp);
 }
@@ -148,19 +167,23 @@ void user_main()
 	dmtx_clear(disp);
 	dmtx_show(disp);
 
-	uint32_t counter = 0;
+	uint32_t counter1 = 0;
+	uint32_t counter2 = 0;
 	while (1) {
-		if (counter++ == 500) {
-			counter = 0;
+		if (counter1++ == 500) {
+			counter2 = 0;
 			// Blink
 			HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
 		}
 
-		HAL_Delay(1);
-
-		if (!capture_pending) {
-			capture_start();
+		if (counter2++ >= 5) {
+			if (!capture_pending) {
+				counter2 = 0;
+				capture_start();
+			}
 		}
+
+		HAL_Delay(1);
 	}
 }
 
