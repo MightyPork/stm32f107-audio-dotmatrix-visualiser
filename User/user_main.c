@@ -3,22 +3,30 @@
 //
 
 #include <inttypes.h>
-#include <stm32f1xx_hal_gpio.h>
-#include <dotmatrix.h>
-#include <arm_math.h>
 #include <arm_const_structs.h>
+#include <arm_math.h>
+#include <stm32f1xx_hal_gpio.h>
+#include "dotmatrix.h"
 #include "mxconstants.h"
 #include "stm32f1xx_hal.h"
 #include "utils.h"
 #include "adc.h"
 #include "tim.h"
 #include "user_main.h"
+#include "debounce.h"
 
 #define SAMPLE_COUNT 256
 #define BIN_COUNT (SAMPLE_COUNT/2)
 
 #define SCREEN_W 32
 #define SCREEN_H 16
+
+// Pins
+#define BTN_CENTER 0
+#define BTN_LEFT 1
+#define BTN_RIGHT 2
+#define BTN_UP 3
+#define BTN_DOWN 4
 
 static uint32_t audio_samples[SAMPLE_COUNT * 2]; // 2x size needed for complex FFT
 static float *audio_samples_f = (float *) audio_samples;
@@ -29,6 +37,8 @@ static volatile bool capture_pending = false;
 
 static void display_wave();
 static void display_fft();
+
+// region Audio capture & display
 
 void capture_start()
 {
@@ -140,20 +150,29 @@ static void display_fft()
 	dmtx_show(dmtx);
 }
 
+// endregion
 
-void user_main()
+// Increment timebase counter each ms
+void HAL_SYSTICK_Callback(void)
 {
-	uart_print("== USER CODE STARTING ==\n");
+	timebase_ms_cb();
+}
 
-	// Leds OFF
-	HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, 1);
-	HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, 1);
-	HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, 1);
-	HAL_GPIO_WritePin(LED4_GPIO_Port, LED4_Pin, 1);
+static void gamepad_button_press(uint32_t btn)
+{
+	uart_print("Button press ");
+	char x[2];
+	x[0] = '0' + btn;
+	x[1] = 0;
+	uart_print(x);
+	uart_print("\n");
+}
 
+void user_init() {
 	// Enable audio input
 	HAL_GPIO_WritePin(AUDIO_NSTBY_GPIO_Port, AUDIO_NSTBY_Pin, 1);
 
+	// Init display
 	DotMatrix_Init disp_init;
 	disp_init.cols = 4;
 	disp_init.rows = 2;
@@ -167,23 +186,60 @@ void user_main()
 	dmtx_clear(disp);
 	dmtx_show(disp);
 
-	uint32_t counter1 = 0;
+	timebase_init(5, 5);
+	debounce_init(5);
+
+	// Gamepad
+	debo_init_t debo;
+	debo.debo_time = 50;
+	debo.invert = true;
+	debo.falling_cb = NULL;
+	debo.rising_cb = gamepad_button_press;
+	// Central button
+	debo.cb_payload = BTN_CENTER;
+	debo.GPIOx = BTN_CE_GPIO_Port;
+	debo.pin = BTN_CE_Pin;
+	debo_register_pin(&debo);
+	// Left
+	debo.cb_payload = BTN_LEFT;
+	debo.GPIOx = BTN_L_GPIO_Port;
+	debo.pin = BTN_L_Pin;
+	debo_register_pin(&debo);
+	// Right
+	debo.cb_payload = BTN_RIGHT;
+	debo.GPIOx = BTN_R_GPIO_Port;
+	debo.pin = BTN_R_Pin;
+	debo_register_pin(&debo);
+	// Up
+	debo.cb_payload = BTN_UP;
+	debo.GPIOx = BTN_UP_GPIO_Port;
+	debo.pin = BTN_UP_Pin;
+	debo_register_pin(&debo);
+	// Down
+	debo.cb_payload = BTN_DOWN;
+	debo.GPIOx = BTN_DN_GPIO_Port;
+	debo.pin = BTN_DN_Pin;
+	debo_register_pin(&debo);
+}
+
+
+void user_main()
+{
+	uart_print("== USER CODE STARTING ==\n");
+
+	user_init();
+
+	ms_time_t counter1 = 0;
 	uint32_t counter2 = 0;
 	while (1) {
-		if (counter1++ == 500) {
-			counter2 = 0;
+		if (ms_loop_elapsed(&counter1, 500)) {
 			// Blink
 			HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
 		}
 
-		if (counter2++ >= 5) {
-			if (!capture_pending) {
-				counter2 = 0;
-				capture_start();
-			}
+		if (!capture_pending) {
+			capture_start();
 		}
-
-		HAL_Delay(1);
 	}
 }
 
