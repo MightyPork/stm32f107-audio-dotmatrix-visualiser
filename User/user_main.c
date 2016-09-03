@@ -12,6 +12,7 @@
 #include "user_main.h"
 #include "debounce.h"
 #include "debug.h"
+#include "fft_windows.h"
 
 // 512 = show 0-5 kHz
 // 256 = show 0-10 kHz
@@ -31,12 +32,15 @@
 #define BTN_DOWN 4
 
 // Y axis scaling factors
-#define WAVEFORM_SCALE 0.008f
+#define WAVEFORM_SCALE 0.007f
 #define FFT_SCALE 0.25f * 0.3f
 #define FFT_SPINDLE_SCALE_MULT 0.5f
 
 uint32_t audio_samples[SAMPLE_COUNT * 2]; // 2x size needed for complex FFT
 float *audio_samples_f = (float *) audio_samples;
+
+// counter for auto repeat
+ms_time_t btn_press_cnt = 0;
 
 /** Dot matrix display instance */
 DotMatrix_Cfg *disp;
@@ -50,12 +54,11 @@ uint8_t brightness = 4;
 
 /** active rendering mode (visualisation preset) */
 enum {
-	MODE_WAVEFORM = 0,
-	MODE_SPECTRUM = 1,
-	MODE_SPECTRUM2 = 2,
+	MODE_SPECTRUM,
+	MODE_SPECTRUM2,
+	MODE_WAVEFORM,
+	MAX_MODE
 } render_mode;
-
-#define MODE_MAX MODE_SPECTRUM2
 
 bool up_pressed = false;
 bool down_pressed = false;
@@ -134,7 +137,7 @@ void spread_samples_for_fft()
 {
 	for (int i = SAMPLE_COUNT - 1; i >= 0; i--) {
 		audio_samples_f[i * 2 + 1] = 0;              // imaginary
-		audio_samples_f[i * 2] = audio_samples_f[i]; // real
+		audio_samples_f[i * 2] = audio_samples_f[i] * win_hamming_512[i]; // real
 	}
 }
 
@@ -243,25 +246,41 @@ static void gamepad_button_cb(uint32_t btn, bool press)
 	switch (btn) {
 		case BTN_UP:
 			up_pressed = press;
+			if (press) {
+				btn_press_cnt = 0;
+				y_scale += 0.5f;
+			}
 			break;
 
 		case BTN_DOWN:
 			down_pressed = press;
+			if (press) {
+				btn_press_cnt = 0;
+				if (y_scale > 0.55) y_scale -= 0.5f;
+			}
 			break;
 
 		case BTN_LEFT:
 			left_pressed = press;
+			if (press) {
+				btn_press_cnt = 0;
+				if (brightness > 0) brightness--;
+			}
 			break;
 
 		case BTN_RIGHT:
 			right_pressed = press;
+			if (press) {
+				btn_press_cnt = 0;
+				if (brightness < 15) brightness++;
+			}
 			break;
 
 		case BTN_CENTER:
 			if (!press) {
 				// center button released
 				// cycle through modes
-				if (render_mode++ == MODE_MAX) {
+				if (++render_mode == MAX_MODE) {
 					render_mode = 0;
 				}
 			}
@@ -345,35 +364,25 @@ void user_main()
 	user_init();
 
 	ms_time_t counter1 = 0;
-	ms_time_t counter2 = 0;
-	ms_time_t btn_scale_cnt = 0;
-	ms_time_t btn_brt_cnt = 0;
 	while (1) {
 		if (ms_loop_elapsed(&counter1, 500)) {
 			// Blink
 			HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
 		}
 
-		// hold-to-repeat for up/down buttons (sensitivity)
+		// hold-to-repeat
 		// This is not the correct way to do it, but good enough
-		if (ms_loop_elapsed(&btn_scale_cnt, 50)) {
+		if (ms_loop_elapsed(&btn_press_cnt, 100)) {
 			if (up_pressed) {
-				y_scale += 0.1;
+				y_scale += 0.5;
 			}
 
 			if (down_pressed) {
-				if (y_scale > 0.1) {
-					y_scale -= 0.1;
+				if (y_scale > 0.55) {
+					y_scale -= 0.5;
 				}
 			}
 
-			if (up_pressed || down_pressed) {
-				dbg("scale = %.1f", y_scale);
-			}
-		}
-
-		// hold-to-repeat for left/right buttons (brightness)
-		if (ms_loop_elapsed(&btn_brt_cnt, 200)) {
 			if (left_pressed) {
 				if (brightness > 0) {
 					brightness--;
@@ -384,6 +393,10 @@ void user_main()
 				if (brightness < 15) {
 					brightness++;
 				}
+			}
+
+			if (up_pressed || down_pressed) {
+				dbg("scale = %.1f", y_scale);
 			}
 
 			if (left_pressed || right_pressed) {
