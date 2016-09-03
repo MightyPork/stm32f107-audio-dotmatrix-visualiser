@@ -82,7 +82,7 @@ void spread_samples_for_fft()
 void display_wave()
 {
 	float wave_y_mult = 0.0078125f;
-	float relative = 3;
+	float relative = 1;
 
 	samples_to_float();
 
@@ -162,7 +162,7 @@ void user_main()
 	disp_init.SPIx = SPI1;
 	disp = dmtx_init(&disp_init);
 
-	dmtx_intensity(disp, 2);
+	dmtx_intensity(disp, 7);
 
 	dmtx_clear(disp);
 	dmtx_show(disp);
