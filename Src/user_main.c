@@ -5,6 +5,8 @@
 #include <inttypes.h>
 #include <stm32f1xx_hal_gpio.h>
 #include <dotmatrix.h>
+#include <arm_math.h>
+#include <arm_const_structs.h>
 #include "mxconstants.h"
 #include "stm32f1xx_hal.h"
 #include "utils.h"
@@ -12,37 +14,116 @@
 #include "tim.h"
 #include "user_main.h"
 
-static uint32_t audio_samples[256];
+#define SAMPLE_COUNT 256
+#define BIN_COUNT (SAMPLE_COUNT/2)
+
+#define SCREEN_W 32
+#define SCREEN_H 16
+
+static uint32_t audio_samples[SAMPLE_COUNT * 2]; // 2x size needed for complex FFT
+static float *audio_samples_f = (float *) audio_samples;
 
 static DotMatrix_Cfg *disp;
 
-void start_DMA() {
+static volatile bool capture_pending = false;
+
+static void display_wave();
+static void display_fft();
+
+void capture_start()
+{
+	if (capture_pending) return;
+	capture_pending = true;
+
 	//uart_print("- Starting ADC DMA\n");
 
-	HAL_ADC_Start_DMA(&hadc1, audio_samples, 32);
+	HAL_ADC_Start_DMA(&hadc1, audio_samples, SAMPLE_COUNT);
 	HAL_TIM_Base_Start(&htim3);
 }
 
 /** This callback is called by HAL after the transfer is complete */
-void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
-//	uart_print("- DMA complete.\n");
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
+{
+	display_wave();
+	capture_pending = false;
+}
 
-//	char x[100];
-//
-//	for (int i = 0; i < 256; i++) {
-//		sprintf(x, "%"PRIu32" ", audio_samples[i]);
-//		uart_print(x);
-//	}
-//	uart_print("\n");
+/**
+ * Convert audio samples to float.
+ * NOTE: This trashes the original array of ints, they share the same memory location.
+ */
+void samples_to_float()
+{
+	// Convert to float
+	for (int i = 0; i < SAMPLE_COUNT; i++) {
+		audio_samples_f[i] = (float) audio_samples[i];
+	}
 
+	// Obtain mean value
+	float mean;
+	arm_mean_f32(audio_samples_f, SAMPLE_COUNT, &mean);
+
+	// Subtract mean from all samples
+	for (int i = 0; i < SAMPLE_COUNT; i++) {
+		audio_samples_f[i] -= mean;
+	}
+}
+
+/** Spread numbers in the samples array so that they are interleaved by zeros (imaginary part) */
+void spread_samples_for_fft()
+{
+	for (int i = SAMPLE_COUNT - 1; i >= 0; i--) {
+		audio_samples_f[i * 2 + 1] = 0;              // imaginary
+		audio_samples_f[i * 2] = audio_samples_f[i]; // real
+	}
+}
+
+/** Display waveform preview */
+void display_wave()
+{
 	dmtx_clear(disp);
 	for (int i = 0; i < 32; i++) {
-		dmtx_set(disp, i, ((audio_samples[i])>>6)-24, 1);
+		dmtx_set(disp, i, ((audio_samples[i]) >> 6) - 24, 1);
 	}
 	dmtx_show(disp);
 }
 
-void user_main() {
+/** Calculate and display FFT */
+static void display_fft()
+{
+	float *bins = audio_samples_f;
+
+	samples_to_float();
+	spread_samples_for_fft();
+
+	const arm_cfft_instance_f32 *S;
+	S = &arm_cfft_sR_f32_len128;
+
+	arm_cfft_f32(S, bins, 0, true); // bit reversed FFT
+	arm_cmplx_mag_f32(bins, bins, BIN_COUNT); // get magnitude (extract real values)
+
+	// Normalize & display
+
+	dmtx_clear(dmtx);
+
+	float factor = (1.0f / BIN_COUNT) * 0.25f;
+	for (int i = 0; i < BIN_COUNT; i++) { // +1 because bin 0 is always 0
+		bins[i] *= factor;
+	}
+
+	// TODO implement offset using gamepad buttons
+	for (int x = 0; x < SCREEN_W; x++) {
+		for (int j = 0; j < 1 + floorf(bins[x]); j++) {
+			dmtx_set(dmtx, x, j, 1);
+		}
+	}
+
+	dmtx_show(dmtx);
+}
+
+
+void user_main()
+{
 	uart_print("== USER CODE STARTING ==\n");
 
 	// Leds OFF
@@ -67,22 +148,26 @@ void user_main() {
 	dmtx_clear(disp);
 	dmtx_show(disp);
 
+	uint32_t counter = 0;
 	while (1) {
-		// Blink
-		HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
-		HAL_Delay(50);
+		if (counter++ == 500) {
+			counter = 0;
+			// Blink
+			HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
+		}
 
-		//uart_print("Main loop\n");
-		start_DMA();
+		HAL_Delay(1);
 
-		//dmtx_toggle(disp, 31, 15);
-		//dmtx_show(disp);
+		if (!capture_pending) {
+			capture_start();
+		}
 	}
 }
 
 //region Error handlers
 
-void user_Error_Handler() {
+void user_Error_Handler()
+{
 	uart_print("HAL error occurred.\n");
 	while (1);
 }
@@ -94,11 +179,13 @@ void user_Error_Handler() {
    * @param line: assert_param error line source number
    * @retval None
    */
-void user_assert_failed(uint8_t *file, uint32_t line) {
+void user_assert_failed(uint8_t *file, uint32_t line)
+{
 	user_error_file_line("Assert failed", (const char *) file, line);
 }
 
-void user_error_file_line(const char *message, const char *file, uint32_t line) {
+void user_error_file_line(const char *message, const char *file, uint32_t line)
+{
 	uart_print(message);
 	uart_print(" in file ");
 	uart_print((char *) file);

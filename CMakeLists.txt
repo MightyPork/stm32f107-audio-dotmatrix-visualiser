@@ -19,6 +19,9 @@ include_directories(/usr/lib/gcc/arm-none-eabi/6.1.1/include/)
 
 
 add_definitions(-DSTM32F107xC)
+add_definitions(-DARM_MATH_CM3)
+add_definitions(-DF_CPU=72000000UL)
+
 add_definitions(-DUSE_FULL_ASSERT)
 add_executable(${PROJECT_NAME}.elf ${USER_SOURCES} ${LINKER_SCRIPT})
 

@@ -31,12 +31,12 @@
   ******************************************************************************
   */
 /* Includes ------------------------------------------------------------------*/
-#include <utils.h>
 #include "stm32f1xx_hal.h"
 #include "stm32f1xx.h"
 #include "stm32f1xx_it.h"
 
 /* USER CODE BEGIN 0 */
+#include "utils.h"
 
 /* USER CODE END 0 */
 
@@ -66,7 +66,7 @@ void NMI_Handler(void)
 void HardFault_Handler(void)
 {
   /* USER CODE BEGIN HardFault_IRQn 0 */
-	uart_print("Hard fault.\n");
+  uart_print("Hard fault.\n");
 
   /* USER CODE END HardFault_IRQn 0 */
   while (1)
@@ -83,7 +83,7 @@ void HardFault_Handler(void)
 void MemManage_Handler(void)
 {
   /* USER CODE BEGIN MemoryManagement_IRQn 0 */
-	uart_print("MemManage fault.\n");
+  uart_print("MemManage fault.\n");
 
   /* USER CODE END MemoryManagement_IRQn 0 */
   while (1)
@@ -100,7 +100,7 @@ void MemManage_Handler(void)
 void BusFault_Handler(void)
 {
   /* USER CODE BEGIN BusFault_IRQn 0 */
-	uart_print("Bus fault.\n");
+  uart_print("Bus fault.\n");
 
   /* USER CODE END BusFault_IRQn 0 */
   while (1)
@@ -117,7 +117,7 @@ void BusFault_Handler(void)
 void UsageFault_Handler(void)
 {
   /* USER CODE BEGIN UsageFault_IRQn 0 */
-	uart_print("Usage fault.\n");
+  uart_print("Usage fault.\n");
 
   /* USER CODE END UsageFault_IRQn 0 */
   while (1)
