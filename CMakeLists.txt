@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.5.0)
 file(GLOB_RECURSE USER_SOURCES "User/*.c")
 file(GLOB_RECURSE MX_SOURCES "Src/*.c")
 file(GLOB_RECURSE HAL_SOURCES "Drivers/STM32F1xx_HAL_Driver/Src/*.c")
-file(GLOB_RECURSE CMSIS_SOURCES "Drivers/CMSIS/DSP_Lib/Source/*.c")
+file(GLOB_RECURSE CMSIS_SOURCES "Drivers/CMSIS/DSP_Lib/Source/*.c" "Drivers/CMSIS/DSP_Lib/Source/*.S")
 
 add_library(HAL ${HAL_SOURCES})
 add_library(CMSIS ${CMSIS_SOURCES}
