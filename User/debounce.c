@@ -17,8 +17,7 @@ typedef struct {
 	ms_time_t debo_time;         ///< debouncing time (ms)
 	ms_time_t counter_0;         ///< counter for falling edge (ms)
 	ms_time_t counter_1;         ///< counter for rising edge (ms)
-	void (*falling_cb)(uint32_t);
-	void (*rising_cb)(uint32_t);
+	void (*callback)(uint32_t, bool);
 } debo_slot_t;
 
 
@@ -71,8 +70,7 @@ debo_id_t debo_register_pin(debo_init_t *init)
 
 		slot->GPIOx = init->GPIOx;
 		slot->pin = init->pin;
-		slot->falling_cb = init->falling_cb;
-		slot->rising_cb = init->rising_cb;
+		slot->callback = init->callback;
 		slot->cb_payload = init->cb_payload;
 		slot->invert = init->invert;
 		slot->counter_0 = 0;
@@ -111,8 +109,8 @@ void debo_periodic_task(void *unused)
 				if (slot->counter_0++ == slot->debo_time) {
 					slot->state = 0;
 
-					if (slot->falling_cb != NULL) {
-						slot->falling_cb(slot->cb_payload);
+					if (slot->callback != NULL) {
+						slot->callback(slot->cb_payload, false);
 					}
 				}
 			} else {
@@ -121,8 +119,8 @@ void debo_periodic_task(void *unused)
 				if (slot->counter_1++ == slot->debo_time) {
 					slot->state = 1;
 
-					if (slot->rising_cb != NULL) {
-						slot->rising_cb(slot->cb_payload);
+					if (slot->callback != NULL) {
+						slot->callback(slot->cb_payload, true);
 					}
 				}
 			}

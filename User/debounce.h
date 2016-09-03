@@ -29,8 +29,7 @@ typedef struct {
 	bool invert;                  ///< invert value read from GPIO (button to ground)
 	ms_time_t debo_time;          ///< debounce time in ms, 0 = default (20 ms)
 	uint32_t cb_payload;          ///< Value passed to the callback func
-	void (*rising_cb)(uint32_t);  ///< callback when the pin goes HIGH
-	void (*falling_cb)(uint32_t); ///< callback when the pin goes LOW
+	void (*callback)(uint32_t, bool); ///< callback
 } debo_init_t;
 
 

@@ -35,6 +35,8 @@ static DotMatrix_Cfg *disp;
 
 static volatile bool capture_pending = false;
 
+static float waveform_scale = 1;
+
 static void display_wave();
 static void display_fft();
 
@@ -92,7 +94,6 @@ void spread_samples_for_fft()
 void display_wave()
 {
 	float wave_y_mult = 0.0078125f;
-	float relative = 1;
 
 	samples_to_float();
 
@@ -112,7 +113,7 @@ void display_wave()
 
 	dmtx_clear(disp);
 	for (int i = 0; i < SCREEN_W; i++) {
-		dmtx_set(disp, i, 7 + roundf(audio_samples_f[i + x_offset] * wave_y_mult * relative), 1);
+		dmtx_set(disp, i, 7 + roundf(audio_samples_f[i + x_offset] * wave_y_mult * waveform_scale), 1);
 	}
 	dmtx_show(disp);
 }
@@ -140,7 +141,7 @@ static void display_fft()
 		bins[i] *= factor;
 	}
 
-	// TODO implement offset using gamepad buttons
+	// TODO implement offset using gamepad buttons (?)
 	for (int x = 0; x < SCREEN_W; x++) {
 		for (int j = 0; j < 1 + floorf(bins[x]); j++) {
 			dmtx_set(dmtx, x, j, 1);
@@ -158,9 +159,21 @@ void HAL_SYSTICK_Callback(void)
 	timebase_ms_cb();
 }
 
-static void gamepad_button_press(uint32_t btn)
+bool up_pressed = false;
+bool down_pressed = false;
+
+static void gamepad_button_cb(uint32_t btn, bool press)
 {
-	dbg("Button press %d", btn);
+	dbg("Button press %d, state %d", btn, press);
+
+	switch (btn) {
+		case BTN_UP:
+			up_pressed = press;
+			break;
+		case BTN_DOWN:
+			down_pressed = press;
+			break;
+	}
 }
 
 void user_init() {
@@ -188,8 +201,7 @@ void user_init() {
 	debo_init_t debo;
 	debo.debo_time = 50;
 	debo.invert = true;
-	debo.falling_cb = NULL;
-	debo.rising_cb = gamepad_button_press;
+	debo.callback = gamepad_button_cb;
 	// Central button
 	debo.cb_payload = BTN_CENTER;
 	debo.GPIOx = BTN_CE_GPIO_Port;
@@ -228,10 +240,23 @@ void user_main()
 
 	ms_time_t counter1 = 0;
 	uint32_t counter2 = 0;
+	uint32_t btn_scale_cnt = 0;
 	while (1) {
 		if (ms_loop_elapsed(&counter1, 500)) {
 			// Blink
 			HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
+		}
+
+		if (ms_loop_elapsed(&btn_scale_cnt, 50)) {
+			if (up_pressed) {
+				waveform_scale += 0.1;
+			}
+
+			if (down_pressed) {
+				if (waveform_scale > 0.1) {
+					waveform_scale -= 0.05;
+				}
+			}
 		}
 
 		if (!capture_pending) {
