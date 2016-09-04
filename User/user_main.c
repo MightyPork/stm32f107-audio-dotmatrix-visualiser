@@ -40,7 +40,8 @@ uint32_t audio_samples[SAMPLE_COUNT * 2]; // 2x size needed for complex FFT
 float *audio_samples_f = (float *) audio_samples;
 
 // counter for auto repeat
-ms_time_t btn_press_cnt = 0;
+ms_time_t updn_press_timer = 0;
+ms_time_t ltrt_press_timer = 0;
 
 /** Dot matrix display instance */
 DotMatrix_Cfg *disp;
@@ -49,8 +50,8 @@ DotMatrix_Cfg *disp;
 volatile bool capture_pending = false;
 
 /** scale & brightness config fields. Initial values. */
-float y_scale = 3;
-uint8_t brightness = 4;
+float y_scale = 5;
+uint8_t brightness = 3;
 
 /** active rendering mode (visualisation preset) */
 enum {
@@ -137,7 +138,7 @@ void spread_samples_for_fft()
 {
 	for (int i = SAMPLE_COUNT - 1; i >= 0; i--) {
 		audio_samples_f[i * 2 + 1] = 0;              // imaginary
-		audio_samples_f[i * 2] = audio_samples_f[i] * win_hamming_512[i]; // real
+		audio_samples_f[i * 2] = audio_samples_f[i]; // * win_hamming_512[i]; // real
 	}
 }
 
@@ -247,7 +248,7 @@ static void gamepad_button_cb(uint32_t btn, bool press)
 		case BTN_UP:
 			up_pressed = press;
 			if (press) {
-				btn_press_cnt = 0;
+				updn_press_timer = 0;
 				y_scale += 0.5f;
 			}
 			break;
@@ -255,7 +256,7 @@ static void gamepad_button_cb(uint32_t btn, bool press)
 		case BTN_DOWN:
 			down_pressed = press;
 			if (press) {
-				btn_press_cnt = 0;
+				updn_press_timer = 0;
 				if (y_scale > 0.55) y_scale -= 0.5f;
 			}
 			break;
@@ -263,7 +264,7 @@ static void gamepad_button_cb(uint32_t btn, bool press)
 		case BTN_LEFT:
 			left_pressed = press;
 			if (press) {
-				btn_press_cnt = 0;
+				ltrt_press_timer = 0;
 				if (brightness > 0) brightness--;
 			}
 			break;
@@ -271,7 +272,7 @@ static void gamepad_button_cb(uint32_t btn, bool press)
 		case BTN_RIGHT:
 			right_pressed = press;
 			if (press) {
-				btn_press_cnt = 0;
+				ltrt_press_timer = 0;
 				if (brightness < 15) brightness++;
 			}
 			break;
@@ -372,7 +373,7 @@ void user_main()
 
 		// hold-to-repeat
 		// This is not the correct way to do it, but good enough
-		if (ms_loop_elapsed(&btn_press_cnt, 100)) {
+		if (ms_loop_elapsed(&updn_press_timer, 100)) {
 			if (up_pressed) {
 				y_scale += 0.5;
 			}
@@ -383,6 +384,12 @@ void user_main()
 				}
 			}
 
+			if (up_pressed || down_pressed) {
+				dbg("scale = %.1f", y_scale);
+			}
+		}
+
+		if (ms_loop_elapsed(&ltrt_press_timer, 250)) {
 			if (left_pressed) {
 				if (brightness > 0) {
 					brightness--;
@@ -393,10 +400,6 @@ void user_main()
 				if (brightness < 15) {
 					brightness++;
 				}
-			}
-
-			if (up_pressed || down_pressed) {
-				dbg("scale = %.1f", y_scale);
 			}
 
 			if (left_pressed || right_pressed) {
