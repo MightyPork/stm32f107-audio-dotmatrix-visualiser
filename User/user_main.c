@@ -23,6 +23,7 @@
 
 #define SCREEN_W 32
 #define SCREEN_H 16
+#define DEFAULT_BRIGHTNESS 2
 
 // Pins
 #define BTN_CENTER 0
@@ -35,11 +36,11 @@
 #define WAVEFORM_SCALE 0.02
 #define FFT_PRELOG_SCALE 1.0
 #define FFT_FINAL_SCALE 3.0
-#define FFT_PREFFT_SCALE 0.3
+#define FFT_PREFFT_SCALE 0.4
 
 #define VOL_STEP_TIME 50
 #define VOL_STEP 0.05
-#define VOL_STEP_LARGE 1.0
+#define VOL_STEP_LARGE 0.75
 #define VOL_STEP_THRESH 0.01
 #define VOL_STEP_SPEEDUP_TIME 750
 
@@ -59,7 +60,7 @@ volatile bool capture_pending = false;
 
 /** scale & brightness config fields. Initial values. */
 float y_scale = 1;
-uint8_t brightness = 3;
+uint8_t brightness = DEFAULT_BRIGHTNESS;
 
 /** active rendering mode (visualisation preset) */
 enum {
