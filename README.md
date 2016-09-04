@@ -2,6 +2,8 @@
 
 Simple audio visualiser with a dot matrix LED display.
 
+[Video](https://twitter.com/MightyPork/status/772210972228456448)
+
 ## Functions
 
 - Using the central joystick button, select render mode.
