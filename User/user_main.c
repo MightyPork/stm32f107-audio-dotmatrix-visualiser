@@ -32,9 +32,16 @@
 #define BTN_DOWN 4
 
 // Y axis scaling factors
-#define WAVEFORM_SCALE 0.007f
-#define FFT_SCALE 0.25f * 0.3f
-#define FFT_SPINDLE_SCALE_MULT 0.5f
+#define WAVEFORM_SCALE 0.02f
+#define FFT_PRELOG_SCALE 1.0f
+#define FFT_FINAL_SCALE 3.0f
+#define FFT_PREFFT_SCALE 0.1f
+
+#define VOL_STEP_TIME 50
+#define VOL_STEP 0.05
+#define VOL_STEP_LARGE 0.5
+#define VOL_STEP_THRESH 0.01
+#define VOL_STEP_SPEEDUP_TIME 1000
 
 uint32_t audio_samples[SAMPLE_COUNT * 2]; // 2x size needed for complex FFT
 float *audio_samples_f = (float *) audio_samples;
@@ -42,6 +49,7 @@ float *audio_samples_f = (float *) audio_samples;
 // counter for auto repeat
 ms_time_t updn_press_timer = 0;
 ms_time_t ltrt_press_timer = 0;
+ms_time_t updn_hold_ts;
 
 /** Dot matrix display instance */
 DotMatrix_Cfg *disp;
@@ -50,7 +58,7 @@ DotMatrix_Cfg *disp;
 volatile bool capture_pending = false;
 
 /** scale & brightness config fields. Initial values. */
-float y_scale = 5;
+float y_scale = 1;
 uint8_t brightness = 3;
 
 /** active rendering mode (visualisation preset) */
@@ -171,12 +179,17 @@ void display_wave()
 	dmtx_show(disp);
 }
 
-/** Calculate and display FFT */
+/** Calculate FFT */
 static void calculate_fft()
 {
 	float *bins = audio_samples_f;
 
 	samples_to_float();
+
+	for (int i = 0; i < SAMPLE_COUNT; i++) {
+		bins[i] *= y_scale * FFT_PREFFT_SCALE; //win_hamming_512[i];
+	}
+
 	spread_samples_for_fft();
 
 	const arm_cfft_instance_f32 *S;
@@ -187,17 +200,18 @@ static void calculate_fft()
 
 	// Normalize & display
 
-	start_render();
-
-	float factor = (1.0f / BIN_COUNT) * FFT_SCALE * y_scale;
 	for (int i = 0; i < BIN_COUNT; i++) { // +1 because bin 0 is always 0
-		bins[i] *= factor;
+		float bin = bins[i] * (1.0f / BIN_COUNT) * FFT_PRELOG_SCALE;
+		bin = log2f(bin);
+		bins[i] = bin * FFT_FINAL_SCALE;
 	}
 }
 
 /** Render classic FFT */
 static void display_fft()
 {
+	start_render();
+
 	float *bins = audio_samples_f;
 
 	for (int x = 0; x < SCREEN_W; x++) {
@@ -212,10 +226,12 @@ static void display_fft()
 /** Render FFT "spindle" */
 static void display_fft_spindle()
 {
+	start_render();
+
 	float *bins = audio_samples_f;
 
 	for (int x = 0; x < SCREEN_W; x++) {
-		for (int j = 0; j < 1 + floorf(bins[x] * FFT_SPINDLE_SCALE_MULT); j++) {
+		for (int j = 0; j < 1 + floorf(bins[x] * 0.5f); j++) {
 			dmtx_set(disp, x, 7 + j, 1);
 			dmtx_set(disp, x, 7 - j, 1);
 		}
@@ -248,16 +264,20 @@ static void gamepad_button_cb(uint32_t btn, bool press)
 		case BTN_UP:
 			up_pressed = press;
 			if (press) {
+				updn_hold_ts = ms_now();
 				updn_press_timer = 0;
-				y_scale += 0.5f;
+				y_scale += VOL_STEP;
 			}
 			break;
 
 		case BTN_DOWN:
 			down_pressed = press;
 			if (press) {
+				updn_hold_ts = ms_now();
 				updn_press_timer = 0;
-				if (y_scale > 0.55) y_scale -= 0.5f;
+				if (y_scale > VOL_STEP + VOL_STEP_THRESH) {
+					y_scale -= VOL_STEP;
+				}
 			}
 			break;
 
@@ -365,6 +385,7 @@ void user_main()
 	user_init();
 
 	ms_time_t counter1 = 0;
+	ms_time_t counter2 = 0;
 	while (1) {
 		if (ms_loop_elapsed(&counter1, 500)) {
 			// Blink
@@ -373,19 +394,31 @@ void user_main()
 
 		// hold-to-repeat
 		// This is not the correct way to do it, but good enough
-		if (ms_loop_elapsed(&updn_press_timer, 100)) {
+		if (ms_loop_elapsed(&updn_press_timer, VOL_STEP_TIME)) {
 			if (up_pressed) {
-				y_scale += 0.5;
+				if (ms_now() - updn_hold_ts > VOL_STEP_SPEEDUP_TIME) {
+					y_scale += VOL_STEP_LARGE;
+				} else {
+					y_scale += VOL_STEP;
+				}
 			}
 
 			if (down_pressed) {
-				if (y_scale > 0.55) {
-					y_scale -= 0.5;
+				if (ms_now() - updn_hold_ts > VOL_STEP_SPEEDUP_TIME) {
+					if (y_scale > VOL_STEP_LARGE + VOL_STEP_THRESH) {
+						y_scale -= VOL_STEP_LARGE;
+					} else if (y_scale > VOL_STEP + VOL_STEP_THRESH) {
+						y_scale -= VOL_STEP;
+					}
+				} else {
+					if (y_scale > VOL_STEP + VOL_STEP_THRESH) {
+						y_scale -= VOL_STEP;
+					}
 				}
 			}
 
 			if (up_pressed || down_pressed) {
-				dbg("scale = %.1f", y_scale);
+				dbg("scale = %.2f", y_scale);
 			}
 		}
 
@@ -408,9 +441,11 @@ void user_main()
 		}
 
 		// capture a sample to update display
-		if (!capture_pending) {
-			capture_start();
-		}
+		//if (ms_loop_elapsed(&counter2, 10)) {
+			if (!capture_pending) {
+				capture_start();
+			}
+		//}
 	}
 }
 
