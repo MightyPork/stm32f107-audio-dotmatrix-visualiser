@@ -32,16 +32,16 @@
 #define BTN_DOWN 4
 
 // Y axis scaling factors
-#define WAVEFORM_SCALE 0.02f
-#define FFT_PRELOG_SCALE 1.0f
-#define FFT_FINAL_SCALE 3.0f
-#define FFT_PREFFT_SCALE 0.1f
+#define WAVEFORM_SCALE 0.02
+#define FFT_PRELOG_SCALE 1.0
+#define FFT_FINAL_SCALE 3.0
+#define FFT_PREFFT_SCALE 0.3
 
 #define VOL_STEP_TIME 50
 #define VOL_STEP 0.05
-#define VOL_STEP_LARGE 0.5
+#define VOL_STEP_LARGE 1.0
 #define VOL_STEP_THRESH 0.01
-#define VOL_STEP_SPEEDUP_TIME 1000
+#define VOL_STEP_SPEEDUP_TIME 750
 
 uint32_t audio_samples[SAMPLE_COUNT * 2]; // 2x size needed for complex FFT
 float *audio_samples_f = (float *) audio_samples;
