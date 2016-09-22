@@ -21,10 +21,6 @@ typedef struct {
 	uint32_t rows; /*!< Number of drivers vertically */
 } DotMatrix_Init;
 
-// global inst
-extern DotMatrix_Cfg *dmtx;
-
-
 DotMatrix_Cfg* dmtx_init(DotMatrix_Init *init);
 
 /**

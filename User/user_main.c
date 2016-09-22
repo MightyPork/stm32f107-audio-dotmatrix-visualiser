@@ -13,6 +13,8 @@
 #include "debounce.h"
 #include "debug.h"
 #include "fft_windows.h"
+#include "screendef.h"
+#include "scrolltext.h"
 
 // 512 = show 0-5 kHz
 // 256 = show 0-10 kHz
@@ -21,9 +23,7 @@
 #define BIN_COUNT (SAMPLE_COUNT/2)
 #define CFFT_INST arm_cfft_sR_f32_len256
 
-#define SCREEN_W 32
-#define SCREEN_H 16
-#define DEFAULT_BRIGHTNESS 2
+#define DEFAULT_BRIGHTNESS 3
 
 // Pins
 #define BTN_CENTER 0
@@ -44,6 +44,8 @@
 #define VOL_STEP_THRESH 0.01
 #define VOL_STEP_SPEEDUP_TIME 750
 
+#define SCROLL_STEP_MS 15
+
 uint32_t audio_samples[SAMPLE_COUNT * 2]; // 2x size needed for complex FFT
 float *audio_samples_f = (float *) audio_samples;
 
@@ -62,10 +64,14 @@ volatile bool capture_pending = false;
 float y_scale = 1;
 uint8_t brightness = DEFAULT_BRIGHTNESS;
 
+/** var used to signalize to MAIN that a banner should scroll */
+static bool request_banner_text = false;
+
 /** active rendering mode (visualisation preset) */
 enum {
 	MODE_SPECTRUM,
 	MODE_SPECTRUM2,
+	MODE_LINEAR,
 	MODE_WAVEFORM,
 	MAX_MODE
 } render_mode;
@@ -77,7 +83,7 @@ bool right_pressed = false;
 
 static void display_wave();
 
-static void calculate_fft();
+static void calculate_fft(bool logmode);
 
 static void display_fft();
 
@@ -102,18 +108,28 @@ void capture_start()
 /** This callback is called by HAL after the transfer is complete */
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
 {
+	if (text_moving || request_banner_text) {
+		capture_pending = false;
+		return;
+	}
+
 	switch (render_mode) {
 		case MODE_WAVEFORM:
 			display_wave();
 			break;
 
+		case MODE_LINEAR:
+			calculate_fft(false);
+			display_fft();
+			break;
+
 		case MODE_SPECTRUM:
-			calculate_fft();
+			calculate_fft(true);
 			display_fft();
 			break;
 
 		case MODE_SPECTRUM2:
-			calculate_fft();
+			calculate_fft(true);
 			display_fft_spindle();
 			break;
 	}
@@ -181,7 +197,7 @@ void display_wave()
 }
 
 /** Calculate FFT */
-static void calculate_fft()
+static void calculate_fft(bool logmode)
 {
 	float *bins = audio_samples_f;
 
@@ -203,7 +219,11 @@ static void calculate_fft()
 
 	for (int i = 0; i < BIN_COUNT; i++) { // +1 because bin 0 is always 0
 		float bin = bins[i] * (1.0f / BIN_COUNT) * FFT_PRELOG_SCALE;
-		bin = log2f(bin);
+		if (logmode) {
+			bin = log2f(bin);
+		} else {
+			//
+		}
 		bins[i] = bin * FFT_FINAL_SCALE;
 	}
 }
@@ -216,7 +236,9 @@ static void display_fft()
 	float *bins = audio_samples_f;
 
 	for (int x = 0; x < SCREEN_W; x++) {
-		for (int j = 0; j < 1 + floorf(bins[x]); j++) {
+		float bin = floorf(bins[x]);
+		if (bin<0) bin=0;
+		for (int j = 0; j < 1 + bin; j++) {
 			dmtx_set(disp, x, j, 1);
 		}
 	}
@@ -232,7 +254,9 @@ static void display_fft_spindle()
 	float *bins = audio_samples_f;
 
 	for (int x = 0; x < SCREEN_W; x++) {
-		for (int j = 0; j < 1 + floorf(bins[x] * 0.5f); j++) {
+		float bin = floorf(bins[x] * 0.5f);
+		if (bin<0) bin=0;
+		for (int j = 0; j < 1 + bin; j++) {
 			dmtx_set(disp, x, 7 + j, 1);
 			dmtx_set(disp, x, 7 - j, 1);
 		}
@@ -305,9 +329,11 @@ static void gamepad_button_cb(uint32_t btn, bool press)
 				if (++render_mode == MAX_MODE) {
 					render_mode = 0;
 				}
+
+				info("Switched to render mode %d", render_mode);
+				request_banner_text = true;
 			}
 
-			info("Switched to render mode %d", render_mode);
 			break;
 	}
 }
@@ -385,8 +411,9 @@ void user_main()
 
 	user_init();
 
+	request_banner_text = true;
+
 	ms_time_t counter1 = 0;
-	ms_time_t counter2 = 0;
 	while (1) {
 		if (ms_loop_elapsed(&counter1, 500)) {
 			// Blink
@@ -441,12 +468,31 @@ void user_main()
 			}
 		}
 
-		// capture a sample to update display
-		//if (ms_loop_elapsed(&counter2, 10)) {
-			if (!capture_pending) {
-				capture_start();
+		if (request_banner_text) {
+			switch (render_mode) {
+				case MODE_SPECTRUM:
+					scrolltext(disp, "FFT LOG-Y", SCROLL_STEP_MS);
+					break;
+
+				case MODE_SPECTRUM2:
+					scrolltext(disp, "FFT LOG-Y MIRROR", SCROLL_STEP_MS);
+					break;
+
+				case MODE_LINEAR:
+					scrolltext(disp, "FFT LIN-Y", SCROLL_STEP_MS);
+					break;
+
+				case MODE_WAVEFORM:
+					scrolltext(disp, "WAVEFORM", SCROLL_STEP_MS);
+					break;
 			}
-		//}
+			request_banner_text = false;
+		}
+
+		// capture a sample to update display
+		if (!capture_pending) {
+			capture_start();
+		}
 	}
 }
 
